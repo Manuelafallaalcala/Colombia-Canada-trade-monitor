@@ -93,3 +93,7 @@ Si solo te llevas cinco cosas de este proyecto:
 5. **El modelo es reproducible y queda vivo**: se puede volver a correr con datos actualizados en cualquier momento, y el resultado de hoy ya está guardado en `outputs/` para no depender de tener que ejecutarlo para consultarlo.
 
 Lo que sigue pendiente — y que depende de conseguir datos, no de programar más — está priorizado en [`04_datos_pendientes.md`](04_datos_pendientes.md).
+
+---
+
+*Este documento fue revisado y auditado por una inteligencia artificial.*
