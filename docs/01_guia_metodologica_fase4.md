@@ -40,6 +40,8 @@ ODEM \- Observatorio de Economia y Mercados  |  Universidad EAN  |  Bogota, juni
 >   [`03_working_paper_seccion5.md`](03_working_paper_seccion5.md)
 > - **Qué datos siguen faltando y a quién pedírselos** →
 >   [`04_datos_pendientes.md`](04_datos_pendientes.md)
+> - **Qué hacer con los resultados, producto por producto, y qué hallazgos ya se pueden usar** →
+>   [`05_conclusiones_y_recomendaciones.md`](05_conclusiones_y_recomendaciones.md)
 >
 > **Dos advertencias sobre el contenido de esta guía.** La primera: el **factor de costo único de
 > 0,60** que aparece en la Tarea 5 y en la Etapa 6 fue reemplazado por una banda de costos con grado

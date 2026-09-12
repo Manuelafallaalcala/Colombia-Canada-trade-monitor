@@ -94,6 +94,7 @@ The 67 tests here are four kinds: solve something two independent ways and check
 - [`docs/02_auditoria_y_correcciones.md`](docs/02_auditoria_y_correcciones.md) — the 23 errors I found auditing the earlier version, what each one was doing to the numbers, and how I fixed it.
 - [`docs/03_working_paper_seccion5.md`](docs/03_working_paper_seccion5.md) — the results written up as Section 5 of the Working Paper, references included.
 - [`docs/04_datos_pendientes.md`](docs/04_datos_pendientes.md) — what's still missing and who to ask for it.
+- [`docs/05_conclusiones_y_recomendaciones.md`](docs/05_conclusiones_y_recomendaciones.md) — the practical reading of the results: what to actually do with each product, and which findings are solid enough to act on now.
 
 ## Citation
 
