@@ -1,15 +1,30 @@
+# Entorno virtual (se recrea con requirements.txt; nunca se versiona)
 .venv/
 venv/
 env/
+
+# Cache de Python
 __pycache__/
 *.py[cod]
+*.egg-info/
 .pytest_cache/
+
+# Checkpoints y cache de Jupyter (temporales autogenerados, no son resultados)
 .ipynb_checkpoints/
+
+# Configuracion local del editor y del asistente (especifica de cada maquina)
 .claude/
 .vscode/
 .idea/
+
+# Archivos del sistema operativo
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Candado de Office al tener un .xlsx abierto
 ~$*.xlsx
 ~$*.xls
+
+# NOTA: outputs/ y data/processed/ SI se versionan a proposito. Son los
+# entregables de la Fase 4 y deben poder consultarse sin ejecutar el modelo.

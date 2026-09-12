@@ -260,3 +260,71 @@ def precio_fob_cafe_desde_fnc(precio_interno_carga_cop: float, trm: float,
     cop_kg = precio_interno_carga_cop / kg_excelso
     return {'kg_excelso_por_carga': kg_excelso, 'precio_interno_cop_kg': cop_kg,
             'precio_interno_usd_kg': cop_kg / trm}
+
+
+# ---------------------------------------------------------------------------
+# Cobertura natural y exposicion cambiaria
+# ---------------------------------------------------------------------------
+def efecto_cobertura_natural(precio_fob_cad: float, fx: float, fx_base: float,
+                             costo_produccion_cop: float, pct_importado: float,
+                             costo_logistico_cop: float,
+                             costos_accesorios_pct: float = 0.0,
+                             pass_through_flete: float = 1.0) -> dict:
+    """Cuanto amortigua el margen la porcion importada del costo.
+
+    Se mide como diferencia contra el CONTRAFACTUAL de la misma empresa con el
+    mismo costo total pero 100% nacional (pct_importado = 0). Ese es el unico
+    contraste que aisla la cobertura: comparar contra otro producto mezcla el
+    efecto del hedge con el de su estructura de costos.
+
+    El hedge es simetrico. Amortigua la perdida cuando el CAD se debilita y
+    recorta la ganancia cuando se fortalece; `amortiguacion_pp` es positiva solo
+    en el lado adverso. Presentarlo como un beneficio incondicional -como hacia
+    el modelo original- confunde reduccion de varianza con aumento de valor.
+    """
+    comun = (costo_logistico_cop, costos_accesorios_pct, pass_through_flete)
+    con = margen(precio_fob_cad, fx, fx_base, costo_produccion_cop, pct_importado, *comun)
+    sin = margen(precio_fob_cad, fx, fx_base, costo_produccion_cop, 0.0, *comun)
+    return {'margen_pct_con_hedge': con['margen_pct'],
+            'margen_pct_sin_hedge': sin['margen_pct'],
+            'amortiguacion_pp': con['margen_pct'] - sin['margen_pct'],
+            'pct_importado': pct_importado,
+            'fx_relativo': fx / fx_base}
+
+
+def exposicion_cambiaria(precio_fob_cad: float, fx: float, fx_base: float,
+                         costo_produccion_cop: float, pct_importado: float,
+                         costo_logistico_cop: float,
+                         costos_accesorios_pct: float = 0.0,
+                         pass_through_flete: float = 1.0,
+                         choque: float = 0.01) -> float:
+    """Puntos de margen que gana o pierde el producto por cada 1% de movimiento
+    del COP/CAD, por diferencia centrada alrededor de `fx`.
+
+    Es el unico indicador del modelo que discrimina de verdad entre los diez
+    productos con los datos disponibles, porque depende de `pct_importado`
+    (tabla_B9, dato por producto) y no del ratio de costo, que para siete de los
+    diez es un supuesto de grado C. Menor valor = mejor cobertura natural.
+    """
+    comun = (fx_base, costo_produccion_cop, pct_importado, costo_logistico_cop,
+             costos_accesorios_pct, pass_through_flete)
+    lo = margen(precio_fob_cad, fx * (1 - choque), *comun)['margen_pct']
+    hi = margen(precio_fob_cad, fx * (1 + choque), *comun)['margen_pct']
+    return (hi - lo) / 2
+
+
+def vulnerabilidad_relativa(margen_cop: float, ingreso_cop: float,
+                            var_horizonte: float) -> float:
+    """Perdida de cola del horizonte de cobro como % del margen propio del producto.
+
+    Responde la pregunta de presupuesto que el VaR en % de ingreso no responde:
+    con dinero para cubrir solo unos pocos productos, cuales primero. Dos
+    productos con identico VaR sobre ingreso son muy distintos si uno gana 30% de
+    margen y el otro 4%.
+
+    Devuelve NaN si el margen no es positivo: sin margen que proteger, la razon
+    no tiene lectura economica.
+    """
+    if margen_cop <= 0:
+        return float('nan')
+    return abs(var_horizonte) * ingreso_cop / margen_cop * 100

@@ -27,7 +27,7 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'src'))
 
-from mic_cc import config, modelo, riesgo   # noqa: E402
+from mic_cc import config, datos, modelo, riesgo   # noqa: E402
 
 CFG = config.PARAMS
 FX_BASE = 2600.0
@@ -240,3 +240,153 @@ def test_ningun_producto_depende_de_un_ratio_uniforme():
     """REGRESION. El factor unico de 0.60 volvia el margen identico para los 10
     productos y convertia cualquier ranking en un artefacto del precio por kilo."""
     assert config.COSTOS_SECTOR.ratio_base.nunique() > 5
+
+
+# ===========================================================================
+# 6. COBERTURA NATURAL, EXPOSICION Y VULNERABILIDAD
+# ===========================================================================
+BASE = dict(precio_fob_cad=4.25, fx_base=FX_BASE, costo_produccion_cop=6600,
+            costo_logistico_cop=900, costos_accesorios_pct=0.055,
+            pass_through_flete=1.0)
+
+
+def test_cobertura_natural_no_hace_nada_en_el_escenario_base():
+    """CONTROL. En fx = fx_base el factor fx/fx_base vale 1, asi que el costo
+    importado y el nacional cuestan lo mismo: la cobertura no puede tener efecto.
+
+    Importa porque una figura de 'margen bruto vs. ajustado' dibujada en el
+    escenario base mostraria cero por algebra, no por ausencia de cobertura.
+    """
+    e = modelo.efecto_cobertura_natural(fx=FX_BASE, pct_importado=0.65, **BASE)
+    assert abs(e['amortiguacion_pp']) < 1e-9
+
+
+def test_cobertura_natural_amortigua_a_la_baja_y_recorta_al_alza():
+    """El hedge es SIMETRICO. Presentarlo como beneficio incondicional confunde
+    reduccion de varianza con aumento de valor."""
+    baja = modelo.efecto_cobertura_natural(fx=FX_BASE * 0.85, pct_importado=0.65, **BASE)
+    alta = modelo.efecto_cobertura_natural(fx=FX_BASE * 1.15, pct_importado=0.65, **BASE)
+    assert baja['amortiguacion_pp'] > 0
+    assert alta['amortiguacion_pp'] < 0
+
+
+def test_sin_insumo_importado_no_hay_cobertura_natural():
+    """DETECCION. Con pct_importado = 0 el contrafactual es el propio caso."""
+    for fx in (FX_BASE * 0.8, FX_BASE, FX_BASE * 1.2):
+        e = modelo.efecto_cobertura_natural(fx=fx, pct_importado=0.0, **BASE)
+        assert e['amortiguacion_pp'] == pytest.approx(0.0, abs=1e-12)
+
+
+def test_mas_insumo_importado_implica_menos_exposicion_cambiaria():
+    """INVERSION. La exposicion se mide por diferencia numerica; que decrezca
+    monotonamente con pct_importado se deduce de la formula por otro camino."""
+    exp = [modelo.exposicion_cambiaria(fx=FX_BASE, pct_importado=pi, **BASE)
+           for pi in (0.0, 0.25, 0.50, 0.75, 1.0)]
+    assert all(a > b for a, b in zip(exp, exp[1:])), exp
+    assert exp[0] > 0
+
+
+def test_exposicion_coincide_con_la_diferencia_de_margenes():
+    """INVERSION. Recalcular el mismo numero por fuera de la funcion, a mano."""
+    pi = 0.40
+    comun = dict(fx_base=FX_BASE, costo_produccion_cop=6600, pct_importado=pi,
+                 costo_logistico_cop=900, costos_accesorios_pct=0.055,
+                 pass_through_flete=1.0)
+    lo = modelo.margen(4.25, FX_BASE * 0.99, **comun)['margen_pct']
+    hi = modelo.margen(4.25, FX_BASE * 1.01, **comun)['margen_pct']
+    esperado = (hi - lo) / 2
+    assert modelo.exposicion_cambiaria(fx=FX_BASE, pct_importado=pi,
+                                       **BASE) == pytest.approx(esperado)
+
+
+def test_vulnerabilidad_relativa_ordena_por_margen_no_por_ingreso():
+    """El punto entero del indicador: con el MISMO VaR sobre ingreso, el producto
+    de margen estrecho debe salir mas vulnerable que el de margen amplio."""
+    estrecho = modelo.vulnerabilidad_relativa(margen_cop=100, ingreso_cop=10_000,
+                                              var_horizonte=-0.10)
+    amplio = modelo.vulnerabilidad_relativa(margen_cop=3_000, ingreso_cop=10_000,
+                                            var_horizonte=-0.10)
+    assert estrecho > amplio
+    assert estrecho == pytest.approx(1000.0)          # 0.10 * 10000 / 100 * 100
+
+
+def test_vulnerabilidad_relativa_sin_margen_es_nan():
+    """DETECCION. Sin margen que proteger la razon no tiene lectura economica y
+    no debe devolver un numero que alguien pueda ordenar en una tabla."""
+    assert math.isnan(modelo.vulnerabilidad_relativa(0.0, 10_000, -0.10))
+    assert math.isnan(modelo.vulnerabilidad_relativa(-500.0, 10_000, -0.10))
+
+
+# ===========================================================================
+# 7. INTEGRIDAD DE LOS DATOS DE ORIGEN
+# ===========================================================================
+RAIZ = Path(__file__).resolve().parents[1]
+DATA = RAIZ / 'data' / 'raw'
+
+FUENTES = ['TRM_COP_USD_2020_2024.xlsx', 'USDCAD_2020_2024.xlsx',
+           'tabla_B3_drawback_iva.xlsx', 'tabla_B4_precios_referencia.xlsx',
+           'tabla_B6_episodios_historicos.xlsx', 'tabla_B7_instrumentos_cobertura.xlsx',
+           'tabla_B8_tasas_interes.xlsx', 'tabla_B9_estructura_costos.xlsx',
+           'costos_logisticos_rutas.xlsx']
+
+
+@pytest.mark.parametrize('archivo', FUENTES)
+def test_las_fuentes_del_bloque_a_existen(archivo):
+    """El respaldo local solo sirve si esta donde el codigo lo busca."""
+    assert (DATA / archivo).is_file(), f'falta {archivo} en data/raw/'
+
+
+def test_los_tres_archivos_de_producto_declaran_el_mismo_top_10():
+    """REGRESION. La guia documentaba una lista de productos distinta de la que
+    los archivos de origen contienen. Que los tres coincidan no es obvio: son
+    archivos construidos por separado."""
+    b4 = pd.read_excel(DATA / 'tabla_B4_precios_referencia.xlsx')
+    b3 = pd.read_excel(DATA / 'tabla_B3_drawback_iva.xlsx')
+    b9 = pd.read_excel(DATA / 'tabla_B9_estructura_costos.xlsx')
+    hs4 = set(b4.iloc[:, 2].astype(str))
+    assert hs4 == set(b3.codigo_hs.astype(str)) == set(b9.codigo_hs.astype(str))
+    assert hs4 == set(config.TRANSPORTE.codigo_hs) == set(config.COSTOS_SECTOR.codigo_hs)
+    assert len(hs4) == 10
+
+
+def test_el_respaldo_offline_de_usdcad_es_legible():
+    """REGRESION. El repositorio traia este archivo desde el inicio y el modelo
+    original nunca lo leia, mientras su README afirmaba que corria sin red."""
+    d = datos.cargar_usdcad_local(DATA / 'USDCAD_2020_2024.xlsx')
+    assert len(d) > 1000
+    assert {'fecha', 'USDCAD'} <= set(d.columns)
+    assert d.USDCAD.between(1.0, 2.0).all()
+
+
+def test_el_respaldo_offline_construye_la_serie_cruzada():
+    """La cadena completa sin red: dos archivos locales -> COP/CAD con retornos."""
+    trm = datos.cargar_trm_local(DATA / 'TRM_COP_USD_2020_2024.xlsx')
+    ucad = datos.cargar_usdcad_local(DATA / 'USDCAD_2020_2024.xlsx')
+    fx = datos.construir_copcad(trm, ucad, alinear_rezago=True)
+    assert len(fx) > 1000
+    assert fx.COP_CAD.between(1500, 4500).all()
+    assert fx.retorno_log.dropna().abs().max() < 0.15
+
+
+def test_alinear_el_rezago_reduce_la_volatilidad_medida():
+    """REGRESION. La TRM del dia D refleja el mercado de D-1; cruzarla con el dato
+    del BoC de D mezcla dos dias e infla la varianza con ruido de emparejamiento."""
+    trm = datos.cargar_trm_local(DATA / 'TRM_COP_USD_2020_2024.xlsx')
+    ucad = datos.cargar_usdcad_local(DATA / 'USDCAD_2020_2024.xlsx')
+    con = riesgo.volatilidad_anualizada(
+        datos.construir_copcad(trm, ucad, True)['retorno_log'])
+    sin = riesgo.volatilidad_anualizada(
+        datos.construir_copcad(trm, ucad, False)['retorno_log'])
+    assert con < sin
+
+
+def test_el_inventario_de_evidencia_incluye_los_supuestos_de_modelado():
+    """REGRESION. Inventariar solo los datos y omitir pass_through_flete o
+    perfil_exportador haria parecer al modelo mejor sustentado de lo que esta:
+    esos dos supuestos mueven el resultado tanto como cualquier dato."""
+    ev = config.resumen_evidencia()
+    params = set(ev.parametro)
+    assert 'pass_through_flete' in params
+    assert 'perfil_exportador' in params
+    assert set(ev.grado) <= {'A', 'B', 'C'}
+    assert (ev.grado == 'C').sum() >= 10, 'el modelo descansa sobre mas supuestos de los listados'

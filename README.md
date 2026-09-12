@@ -1,51 +1,164 @@
-# MIC-CC — Commercial Intelligence Monitor Colombia-Canada
+# MIC-CC — Commercial Intelligence Monitor Colombia–Canada
 
-Financial risk model for the Colombia–Canada Comprehensive Economic and Trade Agreement (TLCC), built for the top 10 Colombian export products shipped through the Cartagena–Montreal and Cartagena–Vancouver routes. The project quantifies FX risk (COP/CAD), breakeven exchange rates, historical stress scenarios, natural hedging, working-capital cost, forward-hedging cost-benefit, and the Plan Vallejo / VAT Drawback tax benefit, to answer one question for each product: **how much of its margin actually survives a realistic shock, and what can be done about it before it happens.**
+**FX risk model for Colombian SME exporters selling into Canada under the CCoFTA.**
 
-Developed for ODEM (Observatorio de Dinamica Empresarial y Mercados) — Universidad EAN, 2026.
+The Colombia–Canada Free Trade Agreement has fully phased out tariffs on the ten products analysed
+here, so the binding financial risk is no longer customs duty — it is the exchange rate. This model
+quantifies that risk end to end and answers one question per product: **how much of its margin
+actually survives a realistic currency shock, and what can be done about it beforehand?**
 
-## Model modules
+Built for **ODEM** — Universidad EAN, 2026.
+Phase 4 (financial) of the MIC-CC project.
 
-The analysis is organized as 12 sequential stages inside a single notebook, each building on the previous one's output:
+> **Documentation language.** This README is in English. The methodological guide, the audit record,
+> the Working Paper section and the pending-data inventory are in Spanish, in [`docs/`](docs/) —
+> they are deliverables for a Colombian academic audience.
 
-| # | Module | What it answers |
-|---|--------|------------------|
-| 1-4 | Data pipeline | Build the daily COP/CAD cross-rate (2020-2024) from TRM (COP/USD) and USD/CAD, and the product/route/cost dataset for the top 10 exports |
-| 5 | Value at Risk (VaR) | Historical VaR at 95%/99%, Expected Shortfall, Kupiec backtest, rolling VaR, Jarque-Bera normality test |
-| 6 | Margin scenarios | Gross margin for 10 products x 2 routes x 3 FX scenarios (60 combinations) |
-| 7 | Breakeven FX rate | The COP/CAD level at which each product stops being profitable, with a Verde/Amarillo/Rojo risk semaphore |
-| 8 | Natural hedge | How much the margin is cushioned by imported-input costs that move with the same exchange rate as revenue |
-| 9 | Historical stress testing | Margin under 4 real historical COP/CAD episodes (2014-2024), including the 2022-2024 peso appreciation |
-| 10 | Cost of working capital | How much of the margin is eroded by the IBR interest rate while payment is in transit (30/60/90 days) |
-| 11 | Hedging cost-benefit | Whether a forward/NDF contract is worth its cost, compared against VaR, Expected Shortfall, and worst historical loss |
-| 12 | Drawback / VAT adjustment | The final, most complete margin figure, after adding the Plan Vallejo VAT-recovery benefit on imported inputs |
+---
+
+## The finding that reframes the problem
+
+For these ten products, **the adverse scenario is peso *appreciation*, not devaluation.**
+
+That is the opposite of the conventional narrative about FX risk in Colombia, and it follows
+directly from what these exporters are: foreign-currency *earners*. They invoice in CAD and pay
+their costs in COP, so a stronger peso shrinks their revenue in domestic-currency terms while their
+cost base stays put. In the model's historical stress module, the worst of the four documented
+episodes is the 2022–2024 peso appreciation (−24.7 % in COP/CAD), not any of the three devaluations.
+
+---
+
+## What the model computes
+
+Twelve sequential modules, orchestrated by a single notebook over a package of pure functions:
+
+| # | Module | Question it answers |
+|---|---|---|
+| 1 | FX series | Build the daily COP/CAD cross-rate from TRM (COP/USD) and USD/CAD, correcting the one-business-day lag between the two sources |
+| 2 | Value at Risk | Historical VaR at 95 %/99 %, Expected Shortfall, multi-horizon empirical quantiles, out-of-sample Kupiec backtest, Jarque-Bera |
+| 3 | Prices & cost structure | Ten products, with a per-product cost-ratio **band** and an evidence grade, not a single uniform factor |
+| 4 | Preliminary check | The 30-row manual sensitivity table the methodology requires as a control before the model |
+| 5 | Margins & breakeven | Gross margin across 10 products × 2 routes × 3 scenarios, and the COP/CAD level at which each product stops being profitable |
+| 6 | Natural hedge | How much imported-input costs cushion the margin — measured against the right counterfactual, and reported as the symmetric effect it is |
+| 7 | Historical stress | Margins under four real COP/CAD episodes (2014–2024), recomputed on the cross-rate rather than on the TRM |
+| 8 | Working capital | Margin erosion from financing the wait for payment at 30/60/90 days |
+| 9 | FX hedging | Whether a forward/NDF is worth it, with covered interest parity signed correctly |
+| 10 | Plan Vallejo / VAT | The financial value of the VAT float on imported inputs |
+| 11 | Sensitivity | Sweeps of the three fragile assumptions, so a conclusion that does not survive the sweep is not reported as one |
+| 12 | Executive summary | One row per product: margin band, breakeven, semaphore, FX exposure, hedging priority, evidence grade |
+
+---
+
+## Reading the results responsibly
+
+Every parameter carries an **evidence grade**: **A** hard data from a dated primary source,
+**B** trade-association data quantified by reasoned inference, **C** a working assumption — *which is
+not evidence*.
+
+**Fourteen of twenty-four inventoried parameters are grade C**, and the inventory deliberately
+includes the modelling choices (`pass_through_flete`, `perfil_exportador`, density-class payload)
+that move the result as much as any datum does. Consequently:
+
+- Per-product results are reported as a **band**, never as a point.
+- The risk semaphore is **robust**: it grants Green only if the product survives at the unfavourable
+  end of its own band. Requiring that flips the colour on 6 of 20 product-route combinations.
+- **No profitability ranking across products is published.** Seven of the ten cost ratios are
+  grade C; a ranking built on them would be an artefact of price per kilogram, not a finding.
+
+Closing that gap is **data collection, not programming**. The full inventory — every missing datum,
+which institution holds it and what it would unlock — is in
+[`docs/04_datos_pendientes.md`](docs/04_datos_pendientes.md).
+
+The FX series is downloaded **live**, so the spot rate, the scenarios and therefore the semaphore
+depend on the run date. Any figure quoted outside the notebook needs its cut-off date attached.
+
+---
 
 ## Reproducing the analysis
 
 ```bash
-git clone https://github.com/<your-username>/MIC-CC-ODEM-EAN.git
-cd MIC-CC-ODEM-EAN
+git clone <repository-url>
+cd mic-cc-finanzas
+
 python -m venv .venv
-.venv\Scripts\activate        # Windows (use `source .venv/bin/activate` on macOS/Linux)
+.venv\Scripts\activate            # Windows  (source .venv/bin/activate on macOS/Linux)
 pip install -r requirements.txt
-cd Notebooks
-jupyter nbconvert --to notebook --execute --inplace 04_financial_model.ipynb
+
+python -m pytest tests/ -q        # 66 tests
+
+cd notebooks
+jupyter nbconvert --to notebook --execute --inplace mic_cc_modelo_financiero.ipynb
 ```
 
-Source data lives in `dataraw/` (already included in this repository, so the notebook runs end to end with no external downloads). Results are written to `outputs/tables/` (11 tables, `tabla_04` to `tabla_11`) and `outputs/figures/` (5 charts, `figura_04` to `figura_08`). The notebook uses paths relative to `Notebooks/`, so it must be executed from inside that folder (as shown above).
+The notebook locates the repository root itself, so it runs from either `notebooks/` or the root.
 
-## Key findings
+It downloads the TRM from Colombia's open-data portal and USD/CAD from the Bank of Canada Valet
+API, and **falls back automatically to the files in `data/raw/` when there is no network** — the
+fallback is exercised by the test suite, not just claimed. Which source was actually used is printed
+in section 1 of every run.
 
-- **COP/CAD annualized volatility is 15.0%**, with a 95% historical VaR of -13.8% over a 90-day horizon — a realistic worst case for an exporter waiting on payment for a quarter.
-- **9 of the 10 products carry a wide breakeven safety margin** (Verde risk rating); the exception is **Carbon bituminoso**, whose breakeven FX rate exceeds even the highest COP/CAD ever observed in the 2020-2024 series — a structural cost problem (container freight tariffs applied to a bulk commodity), not a currency one.
-- The truly adverse historical scenario for this model is **peso appreciation** (2022-2024), not devaluation — because these are export earners paid in CAD with costs in COP, a stronger peso erodes margin, the opposite of the conventional devaluation narrative.
-- **Natural hedging and the forward-hedging cost-benefit decision are largely product-invariant** by construction (both scale with revenue), so the model adds a **relative-vulnerability ranking** (loss as % of each product's own margin) to identify which products should be hedged first under a limited budget.
-- The **VAT Drawback benefit** is the one adjustment that meaningfully differentiates products, because it depends on each product's imported-input share (25%-65%) — Medicamentos corticosteroides benefits the most (7.4% of revenue).
+---
+
+## Repository layout
+
+```
+.
+├── data/
+│   ├── raw/           9 source files from Block A, each with source URL and consultation date
+│   └── processed/     fx_copcad.xlsx — the daily cross-rate the model builds
+├── notebooks/
+│   └── mic_cc_modelo_financiero.ipynb    the single notebook: it orchestrates, it does not compute
+├── src/mic_cc/
+│   ├── config.py      parameters, data overrides, transport and per-product cost structure
+│   ├── datos.py       FX acquisition and construction of the COP/CAD cross-rate
+│   ├── riesgo.py      historical VaR, Expected Shortfall, backtesting, normality
+│   └── modelo.py      margin, breakeven, logistics, rates, hedging, tax
+├── tests/
+│   └── test_modelo.py 66 tests: inversion, control, detection, and regression on every audit error
+├── outputs/
+│   ├── tables/        21 result tables (.xlsx)
+│   └── figures/       6 charts (.png, 150 dpi)
+├── docs/              methodological guide, audit record, Working Paper section, pending data
+├── requirements.txt
+└── LICENSE
+```
+
+Every formula exists exactly **once**, in `src/mic_cc/`. The original notebook had the margin
+equation implemented three times independently, which meant any correction had to be applied in
+three places or the three would silently disagree.
+
+---
+
+## Test suite
+
+`tests/test_modelo.py` holds 66 tests, and the design criterion is that **every test must be able to
+fail**. The first version of the project reported passing "verifications" that were algebraic
+identities — a 60-day/30-day cost ratio of exactly 2.000 (the formula is linear in days), a
+correlation of 1.000 that its own comment predicted before measuring it. Those validate nothing.
+
+The tests here are of four kinds: **inversion** (solve one way, verify by an independent path),
+**control** (cases with a known answer), **detection** (check that the detectors detect), and
+**regression** (pin every concrete error found in the audit so it cannot come back).
+
+---
+
+## Documentation
+
+| File | Contents |
+|---|---|
+| [`docs/01_guia_metodologica_fase4.md`](docs/01_guia_metodologica_fase4.md) | Step-by-step methodological guide to Phase 4, with concept explanations and a glossary |
+| [`docs/02_auditoria_y_correcciones.md`](docs/02_auditoria_y_correcciones.md) | The 23 errors the quantitative audit found, what each one was doing to the results, and how it was fixed |
+| [`docs/03_working_paper_seccion5.md`](docs/03_working_paper_seccion5.md) | Section 5 of the academic Working Paper, with APA 7 references |
+| [`docs/04_datos_pendientes.md`](docs/04_datos_pendientes.md) | What is still missing, who holds it, and what each datum would unlock |
+
+---
 
 ## Suggested citation
 
-Manuela Alcala. *MIC-CC: Commercial Intelligence Monitor Colombia-Canada — Financial Risk Model.* ODEM, Universidad EAN, 2026.
+> Alcalá, M. (2026). *MIC-CC: Monitor de Inteligencia Comercial Colombia-Canadá — Modelo financiero
+> de riesgo cambiario* (Fase 4). ODEM, Universidad EAN.
 
 ## License
 
-See [LICENSE](LICENSE) for usage terms.
+MIT — see [LICENSE](LICENSE). The licence text also carries the research-use disclaimer and the
+terms governing the source data.

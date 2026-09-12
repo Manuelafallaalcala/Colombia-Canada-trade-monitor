@@ -36,6 +36,12 @@ PARAMS: dict = {
     'pass_through_flete': 1.0,
     'pass_through_sensibilidad': (0.0, 0.5, 1.0),
 
+    # --- sensibilidad al ratio de costo -----------------------------------
+    # Barrido uniforme que conserva, como caso particular, el 0.60 del modelo
+    # original. Sirve para mostrar POR QUE un factor unico no puede discriminar
+    # entre productos: con el, margen% = 1 - factor - accesorios para los diez.
+    'factor_costo_sensibilidad': (0.50, 0.60, 0.70, 0.80, 0.90),
+
     # --- perfil del exportador -------------------------------------------
     # 'productor'      : produce lo que exporta; el costo es su costo de finca/planta.
     # 'comercializador': compra a precio de mercado interno y exporta; el costo es
@@ -86,7 +92,7 @@ PARAMS: dict = {
 
 # ---------------------------------------------------------------------------
 # Correcciones de datos verificadas contra fuente primaria.
-# NO se altera ningun archivo de dataraw/: el override se aplica en memoria.
+# NO se altera ningun archivo de data/raw/: el override se aplica en memoria.
 # ---------------------------------------------------------------------------
 OVERRIDES = pd.DataFrame([
     dict(codigo_hs='0901.11.90.00', campo='precio_usd',
@@ -204,10 +210,16 @@ def resumen_evidencia() -> pd.DataFrame:
         {'parametro': 'tasa_fondeo_pyme_ea', 'grado': 'A'},
         {'parametro': 'tarifa_iva', 'grado': 'A'},
         {'parametro': 'monto_minimo_ndf_usd', 'grado': 'A'},
+        {'parametro': 'dias_float_iva', 'grado': 'B'},
         {'parametro': 'flete_aereo_usd_kg', 'grado': 'C'},
         {'parametro': 'flete_granel_usd_kg', 'grado': 'C'},
         {'parametro': 'spread_ndf_pyme', 'grado': 'C'},
         {'parametro': 'costos_accesorios_pct_fob', 'grado': 'C'},
-        {'parametro': 'dias_float_iva', 'grado': 'B'},
+        # Supuestos de modelado que mueven el resultado tanto como cualquier dato.
+        # Omitirlos del inventario haria parecer al modelo mejor sustentado de lo que esta.
+        {'parametro': 'pass_through_flete', 'grado': 'C'},
+        {'parametro': 'perfil_exportador', 'grado': 'C'},
+        {'parametro': 'payload_kg (clase de densidad)', 'grado': 'C'},
+        {'parametro': 'recargo_reefer', 'grado': 'C'},
     ]
     return pd.DataFrame(filas)
