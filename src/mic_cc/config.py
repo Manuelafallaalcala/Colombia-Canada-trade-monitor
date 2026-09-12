@@ -198,6 +198,28 @@ COSTOS_SECTOR = pd.DataFrame([
 ])
 
 
+# ---------------------------------------------------------------------------
+# Etiquetas cortas para figuras.
+#
+# Los nombres completos vienen de la nomenclatura arancelaria y son descriptivos
+# a proposito, pero en un grafico de barras con diez categorias ocupan mas
+# espacio que los datos. Las tablas conservan siempre el nombre completo: esto es
+# solo presentacion.
+# ---------------------------------------------------------------------------
+NOMBRE_CORTO: dict[str, str] = {
+    '0901.11.90.00': 'Cafe',
+    '2701.12.00.00': 'Carbon',
+    '0804.50.00.00': 'Frutas tropicales',
+    '0603.19.00.00': 'Flores (pompones)',
+    '3004.32.00.00': 'Medicamentos',
+    '6115.96.00.00': 'Calceteria',
+    '7307.92.00.00': 'Accesorios tuberia',
+    '0304.82.00.00': 'Trucha',
+    '2008.19.00.00': 'Nueces/semillas',
+    '0603.11.00.00': 'Rosas',
+}
+
+
 def resumen_evidencia() -> pd.DataFrame:
     """Conteo de parametros por grado de evidencia. Sirve para que ningun informe
     presente como hallazgo algo que descansa sobre supuestos de grado C."""

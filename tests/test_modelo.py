@@ -390,3 +390,11 @@ def test_el_inventario_de_evidencia_incluye_los_supuestos_de_modelado():
     assert 'perfil_exportador' in params
     assert set(ev.grado) <= {'A', 'B', 'C'}
     assert (ev.grado == 'C').sum() >= 10, 'el modelo descansa sobre mas supuestos de los listados'
+
+
+def test_las_etiquetas_cortas_cubren_los_diez_productos():
+    """Una etiqueta faltante hace que la figura falle con KeyError en mitad del
+    cuaderno, despues de haber calculado todo."""
+    assert set(config.NOMBRE_CORTO) == set(config.TRANSPORTE.codigo_hs)
+    assert all(0 < len(v) <= 20 for v in config.NOMBRE_CORTO.values())
+    assert len(set(config.NOMBRE_CORTO.values())) == 10, 'las etiquetas deben ser distinguibles'
